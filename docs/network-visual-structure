@@ -1,0 +1,158 @@
+## (Stand: 2025-06) partially outdated!
+
+### 🔸 Topologie
+
+```
+Internet
+   |
+[Fritzbox] (192.168.178.1)
+   | \
+   |  \
+   |   +-- Portfreigabe 443/TCP (WAN) ➜ MikroTik
+   |        - erlaubt Zugang für Reverse Proxies
+   |
+[MikroTik Router] (192.168.88.1)
+   |
+   +-- Switch / LAN-Bridge
+         |
+         +-- [Synology NAS] (192.168.88.32)
+         |     - Docker: Paperless, Plex, etc.
+         |     - Reverse Proxy auf DSM: Port 443
+         |     - DSM selbst über Port 5001 erreichbar
+         |
+         +-- [iMac] (192.168.88.xx)
+         +-- weitere Clients im LAN
+
+Zusätzlich:
+[MikroTik] NAT-Regel:
+  - dst-port 443 ➜ 192.168.88.32:443 (Paperless via Reverse Proxy)
+```
+
+---
+
+### 🔹 Dienste & Domains
+
+|Dienst|URL|Intern erreichbar|Extern erreichbar|
+|---|---|---|---|
+|DSM|[https://192.168.88.32:5001](https://192.168.88.32:5001/)|✅|❌ (nur per VPN)|
+|Paperless|[https://paperless.user.synology.me](https://paperless.user.synology.me/)|✅ (via DNS/NAT)|✅ (via NAT)|
+|Plex|http(s)://plex.user.synology.me|✅|❓ (abhängig von Regel)|
+
+---
+
+### 🔸 Aktive NAT-Regeln (MikroTik)
+
+- Port 443 ➜ NAS:443 (Paperless)
+    
+- Port 4443 ➜ NAS:4443 (Plex)
+    
+
+---
+
+### 🧱 DSM-Firewall-Konfiguration (Auszug)
+
+|Quell-IP|Ports erlaubt|
+|---|---|
+|192.168.88.0/24|8000, 9000, 5001|
+|Alle (0.0.0.0/0)|443 (nur für Reverse Proxy)|
+
+---
+
+### 🛡️ Sicherheitsempfehlungen (Auszüge)
+
+- Kein Reverse Proxy für DSM öffentlich
+    
+- Zugang zu DSM nur per VPN
+    
+- Protokollierung über MikroTik aktiviert
+    
+- Regelmäßig: DSM-, Router- und Container-Updates
+    
+
+---
+
+Letztes Update: 2025-06-23
+
+## Visuelle Übersicht: ("Nur 1 Port")
+
+### 📅 Stand: Juni 2025
+
+---
+
+### 🏛️ Internetseite (extern)
+
+```
+[ Fairphone (mobil) ]
+[ Laptop extern     ]
+[ Browser z. B. https://paperless.username.synology.me ]
+                    |
+                    v
+             (Port 443, TCP)
+                    |
+            +-----------------+
+            |    Fritzbox     |
+            | Port 443 ➔ NAS |
+            +-----------------+
+```
+
+---
+
+### 🏠 Heimnetz
+
+```
+                 +----------------+
+                 |   MikroTik     |  (LAN-Bridge, kein aktives NAT mehr)
+                 +----------------+
+                          |
+                          v
+                   +-------------+
+                   |    NAS       | (Synology, 192.168.88.32)
+                   +-------------+
+                          |
+          +---------------+---------------+-----------------+
+          |               |               |                 |
+          v               v               v                 v
+  [ Paperless ]   [ Plex ]       [ Nextcloud ]     [ Vikunja (geplant) ]
+     :8000         :32400            :4433               :8282
+     (HTTP)         (HTTP)           (HTTPS)            (HTTP)
+          |               |               |                 |
+          +---------------+---------------+-----------------+
+                          |
+                          v
+         +-------------------------------------------+
+         |   DSM Reverse Proxy (Port 443 ⇒ Dienste)   |
+         +-------------------------------------------+
+                          |
+                          v
+            +-----------------------------+
+            | SSL-Zertifikat (Let's Encrypt) |
+            +-----------------------------+
+```
+
+---
+
+### 📄 Legende
+
+- **Dienste** (Paperless etc.) laufen in Docker, teils im `host`-Modus
+    
+- **Reverse Proxy** leitet eingehende HTTPS-Anfragen basierend auf dem Hostnamen intern auf die Dienste weiter
+    
+- **Nur Port 443 ist extern geöffnet**
+    
+- DSM dient als zentrale Steuerstelle für Zertifikate, Proxyregeln und Zugriffskontrolle
+    
+
+---
+
+### 📊 Vorteile dieser Struktur
+
+- Nur ein öffentlicher Einstiegspunkt (Port 443) ➔ übersichtlich und sicher
+    
+- Trennung von interner Technik und externer Erreichbarkeit
+    
+- Dienste bleiben intern – Reverse Proxy entscheidet, was raus darf
+    
+- Einfache Erweiterbarkeit um neue Container oder Webdienste
+    
+
+---
